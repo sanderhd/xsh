@@ -1,0 +1,31 @@
+{
+  "name": "xsh",
+  "version": "1.0.0",
+  "description": "xsh is a mordern windows shell",
+  "keywords": [
+    "terminal",
+    "shell",
+    "windows"
+  ],
+  "homepage": "https://github.com/sanderhd/xsh#readme",
+  "bugs": {
+    "url": "https://github.com/sanderhd/xsh/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sanderhd/xsh.git"
+  },
+  "license": "MIT",
+  "author": "sanderhd",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "xsh"
+  },
+  "bin": {
+    "xsh": "./bin/index.js"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2"
+  }
+}
