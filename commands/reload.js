@@ -1,8 +1,13 @@
+import chalk from "chalk";
+
 export default {
     name: "reload",
-    run: async ({ print, reload }) => {
-        if (typeof reload === "function") reload();
-        print("Commands opnieuw geladen.");
+    aliases: ["r"],
+    run: async ({ print }) => {
+        print(chalk.hex("#a371f7")(`
+                ${chalk.bold("xsh")} - Reloaded commands!
+            `));
+        process.emit("reloadCommands");
         return { code: 0 };
     },
 };

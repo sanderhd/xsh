@@ -1,15 +1,17 @@
-import fs from "fs/promises";
+import chalk from "chalk";
+import { readFileSync } from "fs";
+import { join } from "path";
+
 export default {
-	name: "version",
-	aliases: ["v"],
-	run: async ({ print }) => {
-		try {
-			const pkg = JSON.parse(await fs.readFile("package.json", "utf8"));
-			print(`xsh version ${pkg.version}`);
-			return { code: 0 };
-		} catch (e) {
-			print("unable to read package.json");
-			return { code: 1 };
-		}
-	},
+    name: "version",
+    aliases: ["v"],
+    run: async ({ print }) => {
+        const packageJson = JSON.parse(
+            readFileSync(join(process.cwd(), "package.json"), "utf8")
+        );
+        print(chalk.hex("#a371f7")(`
+                ${chalk.bold("xsh")} - v${packageJson.version}
+            `));
+        return { code: 0 };
+    },
 };
