@@ -1,11 +1,12 @@
-# xsh
+![xsh banner](/images/banner.png)
 
-xsh® is a modern windows shell made with JavaScript.
+## Introduction
+**xsh** is an open-source shell written in JavaScript. Developers can create their own themes, that every user can install in seconds!
 
-## Todo
-| Status | Task |
-| :--- | :--- |
-| ❌ | Customization via TUI/File
-| ❌ | Themes (from me or the community)
-| ❌ | Autocompletion
-| ❌ | Improve git status (ahead/behind)
+### Contributors
+[![Contributors](https://contrib.rocks/image?repo=sanderhd/xsh)](https://github.com/sanderhd/xsh/graphs/contributors)
+
+### Todo
+- [ ] themes
+- [ ] nano command
+- [ ] support for docker, venv's, node version & more
