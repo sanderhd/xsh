@@ -2,25 +2,56 @@ import chalk from "chalk";
 import readline from "node:readline"
 import { exec } from "node:child_process"
 import os from "node:os"
-import path from "node:path"
 import process, { stderr, stdout } from "node:process";
+import fs from "fs";
+import path from "path"
+import { fileURLToPath, pathToFileURL } from "url";
 
 const icons = {
-    sep: "",
-    branch: "",
+    sep: "▶",
+    sepLeft: "◀",
+    branch: "@",
     ok: "✔",
     fail: "✖",
-    folder: "",
-    github: "",
+    folder: "🗀",
+    github: "^",
 };
 
 let lastExitCode = 0;
+let lastDuration = null;
+const customCommands = new Map();
 
 function bg(hex) { return chalk.bgHex(hex); }
 function fg(hex) { return chalk.hex(hex); }
 
 function segment(text, { fgColor = "#000000", bgColor = "#ffffff"} = {}) {
     return bg(bgColor)(fg(fgColor)(` ${text} `));
+}
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+async function loadCommands() {
+    const commandsDir = path.join(__dirname, "commands");
+    if (!fs.existsSync(commandsDir)) return;
+
+    const files = fs.readdirSync(commandsDir).filter(f => f.endsWith(".js"));
+    for (const file of files) {
+        try {
+            const fullPath = path.join(commandsDir, file);
+            const fileUrl = pathToFileURL(fullPath).href;
+            const command = await import(fileUrl);
+            const name = command.default.name || path.basename(file, ".js");
+            const run = command.default.run;
+
+            if (typeof run === "function") {
+                customCommands.set(name, { run });
+                (command.default.aliases || []).forEach(alias => customCommands.set(alias, { run }));
+            }
+        } catch (err) {
+            console.error(`Error loading command ${file}:`, err);
+        }
+    }
 }
 
 function joinSegments(segments) {
@@ -60,10 +91,14 @@ function getGitBranch() {
 async function renderPrompt() {
     const cwd = getCwdLabel();
     const branch = await getGitBranch();
+    loadCommands();
 
     const status = lastExitCode === 0
         ? `${icons.ok} 0`
         : `${icons.fail} ${lastExitCode}`;
+
+    const now = new Date();
+    const timeStr = now.toLocaleDateString("nl-NL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
     const segs = [];
 
@@ -74,7 +109,7 @@ async function renderPrompt() {
 
     segs.push({
         bgColor: "#7d4fd4",
-        render: segment(`${icons.folder} ${cwd}`, { fgColor: "#ffffff", bgColor: "#7d4fd4" }),
+        render: segment(`${icons.folder}  ${cwd}`, { fgColor: "#ffffff", bgColor: "#7d4fd4" }),
     })
 
     if (branch) {
@@ -85,25 +120,74 @@ async function renderPrompt() {
     }
 
     const line1 = joinSegments(segs);
+
+    const rightParts = [];
+    if (lastDuration === null) {
+        rightParts.push(`⏱ ${timeStr}`);
+    } else {
+        const totalSecs = Math.floor(lastDuration / 1000);
+        const ms = lastDuration % 1000;
+        const mins = Math.floor(totalSecs / 60);
+        const secs = totalSecs % 60;
+        
+        let durStr;
+        if (mins > 0) {
+            durStr = `${mins}m ${secs}s`;
+        } else if (totalSecs > 0) {
+            durStr = `${secs}s`;
+        } else {
+            durStr = `${ms}ms`
+        }
+        rightParts.push(`⏱ ${durStr}`)
+    }
+
+    const rightText = rightParts.join(" ");
+    const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
+    const leftLen = stripAnsi(line1).length;
+    const rightLen = rightText.length + 2;
+    const termWidth = process.stdout.columns || 80;
+    const padding = termWidth - leftLen - rightLen;
+
+    const rightSegment = chalk.hex("#8b949e")(
+        " ".repeat(Math.max(0, padding)) +
+        chalk.hex("#2d333b")(icons.sepLeft) +
+        ` ${rightText} `
+    );
+
     const line2 = chalk.hex("#a371f7")("❯ ");
 
-    return `${line1}\n${line2}`
+    return `${line1}${rightSegment}\n${line2}`
 }
 
 readline.emitKeypressEvents(process.stdin);
 process.stdin.setRawMode(true);
 
 let buffer = "";
+let cursorPos = 0;
 let firstDraw = true;
+let history = [];
+let historyIndex = -1;
+
+const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 function redraw(promptStr) {
+    const visiblePromptLen = stripAnsi(promptStr).length;
+    const desiredCursorCol = visiblePromptLen + cursorPos;
+    const fullLine = promptStr + buffer;
+
     if (firstDraw) {
         firstDraw = false;
-        process.stdout.write(promptStr + buffer);
+        process.stdout.write(fullLine);
+        const endCol = visiblePromptLen + buffer.length;
+        const leftMoves = endCol - desiredCursorCol;
+        if (leftMoves > 0) process.stdout.write(`\x1b[${leftMoves}D`);
     } else {
         process.stdout.write("\x1b[2K\x1b[G");
         process.stdout.write("\x1b[1A\x1b[2K\x1b[G");
-        process.stdout.write(promptStr + buffer);
+        process.stdout.write(fullLine);
+        const endCol = visiblePromptLen + buffer.length;
+        const leftMoves = endCol - desiredCursorCol;
+        if (leftMoves > 0) process.stdout.write(`\x1b[${leftMoves}D`);
     }
 }
 
@@ -128,29 +212,84 @@ async function loop() {
         const exitCode = await new Promise((resolve) => {
             function onKey(str, key) {
                 if (key?.ctrl && key.name === "c") {
-                    process.stdout.write(chalk.reset("\n"));
+                    process.stdin.removeListener("keypress", onKey);
                     process.exit(0);
                 }
 
                 if (key?.name === "return") {
-                    process.stdin.off("keypress", onKey);
+                    process.stdin.removeListener("keypress", onKey);
                     process.stdout.write("\n");
-                    return resolve("ENTER");
+                    resolve(0);
+                    return;
                 }
 
                 if (key?.name === "backspace") {
-                    buffer = buffer.slice(0, -1);
+                    if (cursorPos > 0) {
+                        buffer = buffer.slice(0, cursorPos - 1) + buffer.slice(cursorPos);
+                        cursorPos--;
+                        redraw(promptStr);
+                    }
+                    return;
+                }
+
+                if (key?.name === "delete") {
+                    if (cursorPos < buffer.length) {
+                        buffer = buffer.slice(0, cursorPos) + buffer.slice(cursorPos + 1);
+                        redraw(promptStr);
+                    }
+                    return;
+                }
+
+                if (key?.name === "left") {
+                    if (cursorPos > 0) {
+                        cursorPos--;
+                        redraw(promptStr);
+                    }
+                    return;
+                }
+                if (key?.name === "right") {
+                    if (cursorPos < buffer.length) {
+                        cursorPos++;
+                        redraw(promptStr);
+                    }
+                    return;
+                }
+
+                if (key?.name === "home") {
+                    cursorPos = 0;
+                    redraw(promptStr);
+                    return;
+                }
+                if (key?.name === "end") {
+                    cursorPos = buffer.length;
                     redraw(promptStr);
                     return;
                 }
 
-                if (key?.name === "tab") {
+                if (key?.name === "up") {
+                    if (history.length === 0) return;
+                    if (historyIndex === -1) historyIndex = history.length;
+                    historyIndex = Math.max(0, historyIndex - 1);
+                    buffer = history[historyIndex] || "";
+                    cursorPos = buffer.length;
+                    redraw(promptStr);
+                    return;
+                }
+                if (key?.name === "down") {
+                    if (history.length === 0) return;
+                    if (historyIndex === -1) return;
+                    historyIndex = Math.min(history.length, historyIndex + 1);
+                    buffer = historyIndex === history.length ? "" : (history[historyIndex] || "");
+                    cursorPos = buffer.length;
+                    redraw(promptStr);
                     return;
                 }
 
-                if (key?.sequence && key.sequence.length === 1) {
-                    buffer += key.sequence;
+                if (key?.sequence && key.sequence.length > 0 && !key.ctrl && !key.meta) {
+                    buffer = buffer.slice(0, cursorPos) + key.sequence + buffer.slice(cursorPos);
+                    cursorPos += key.sequence.length;
                     redraw(promptStr);
+                    return;
                 }
             }
 
@@ -161,50 +300,40 @@ async function loop() {
 
         if (!cmd) {
             lastExitCode = 0;
+            historyIndex = -1;
+            buffer = "";
+            cursorPos = 0;
             continue;
+        }
+
+        if (history[history.length - 1] !== cmd) history.push(cmd);
+        historyIndex = -1;
+        buffer = "";
+        cursorPos = 0;
+
+        const [cmdName, ...args] = cmd.split(/\s+/);
+        if (customCommands.has(cmdName)) {
+            const handler = customCommands.get(cmdName).run;
+            const start = Date.now();
+            try {
+                const result = await handler({
+                    args,
+                    cwd: process.cwd(),
+                    print: (s) => process.stdout.write(s + "\n"),
+                    runCommand,
+                    reload: loadCommands,
+                });
+                if (result && typeof result.code === "number") lastExitCode = result.code;
+                else lastExitCode = 0;
+            } catch (e) {
+                lastExitCode = 1;
+                console.error(e);
+            }
+            lastDuration = Date.now() - start;
+            continue
         }
 
         if (cmd === "exit") process.exit(0);
-
-        if (cmd === "xsh" || cmd === "xsh -x") {
-            console.log(chalk.hex("#a371f7")(`\n\nwelcome to xsh! `));
-            console.log(chalk.gray(`a simple custom shell written in node.js\n\n`));
-            
-            lastExitCode = 0;
-            continue;
-        }
-
-        if (cmd === "xsh --help" || cmd === "xsh -h") {
-            console.log(chalk.hex("#a371f7")(`
-                 xsh - a simple custom shell written in node.js
-
-                usage:
-                  xsh           [-x]    show a welcome message
-                  xsh --help    [-h]    show this message
-                  xsh --config  [-c]    show config file path
-                  xsh --version [-v]    show version info
-            `));
-
-            lastExitCode = 0;
-            continue;
-        }
-
-        if (cmd === "xsh --version" || cmd === "xsh -v") {
-            const pkg = JSON.parse(await import("fs").then(m => m.promises.readFile("package.json", "utf-8")));
-            console.log(chalk.hex("#a371f7")(`xsh version ${pkg.version}`));
-
-            lastExitCode = 0;
-            continue;
-        }
-
-        if (cmd === "xsh --config" || cmd === "xsh -c") {
-            const configPath = path.join(os.homedir(), ".xshrc");
-            await import("fs").then(m => m.promises.writeFile(configPath, "# xsh config file\n", { flag: "a" }));
-            console.log(chalk.hex("#a371f7")(`xsh config file path: ${configPath}`));
-
-            lastExitCode = 0;
-            continue;
-        }
 
         if (cmd === "clear") {
             process.stdout.write("\x1b[2J\x1b[H");
@@ -226,7 +355,9 @@ async function loop() {
             continue;
         }
 
+        const start = Date.now();
         lastExitCode = await runCommand(cmd);
+        lastDuration = Date.now() - start;
     }
 }
 
