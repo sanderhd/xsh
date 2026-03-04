@@ -10,6 +10,8 @@ import { fileURLToPath, pathToFileURL } from "url";
 import icons from "./config/icons.json" with { type: "json" };
 import { getTheme, getThemeName, setTheme, listThemes } from "./functions/themeManager.js";
 import autocomplete from "./functions/autoCompletion.js";
+import { getConfigValue } from "./functions/configManager.js";
+import { get } from "node:http";
 
 let lastExitCode = 0;
 let lastDuration = null;
@@ -85,8 +87,14 @@ function getGitBranch() {
 async function renderPrompt() {
     const theme = getTheme();
     const cwd = getCwdLabel();
-    const branch = await getGitBranch();
+    const showGitBranch = getConfigValue("prompt.showGitBranch") ?? true;
+    const branch = showGitBranch ? await getGitBranch() : null;
     await loadCommands();
+
+    const showExitCode = getConfigValue("prompt.showExitCode") ?? true;
+    const showTime = getConfigValue("prompt.showTime") ?? true;
+    const showDuration = getConfigValue("prompt.showDuration") ?? true;
+    const promptSymbol = getConfigValue("prompt.symbol") || "❯";
 
     const status = lastExitCode === 0
         ? `${icons.ok} 0`
@@ -97,10 +105,12 @@ async function renderPrompt() {
 
     const segs = [];
 
-    segs.push({
-        bgColor: lastExitCode === 0 ? theme.accentColor : theme.warningColor,
-        render: segment(status, { fgColor: theme.primaryColor, bgColor: lastExitCode === 0 ? theme.accentColor : theme.warningColor }),
-    });
+    if (showExitCode) {
+        segs.push({
+            bgColor: lastExitCode === 0 ? theme.accentColor : theme.warningColor,
+            render: segment(status, { fgColor: theme.primaryColor, bgColor: lastExitCode === 0 ? theme.accentColor : theme.warningColor }),
+        });
+    }
 
     segs.push({
         bgColor: theme.backgroundColor,
@@ -117,9 +127,9 @@ async function renderPrompt() {
     const line1 = joinSegments(segs);
 
     const rightParts = [];
-    if (lastDuration === null) {
+    if (lastDuration === null && showTime) {
         rightParts.push(`⏱ ${timeStr}`);
-    } else {
+    } else if (lastDuration !== null && showDuration) {
         const totalSecs = Math.floor(lastDuration / 1000);
         const ms = lastDuration % 1000;
         const mins = Math.floor(totalSecs / 60);
@@ -139,17 +149,20 @@ async function renderPrompt() {
     const rightText = rightParts.join(" ");
     const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
     const leftLen = stripAnsi(line1).length;
-    const rightLen = rightText.length + 2;
+    const rightLen = rightText.length > 0 ? rightText.length + 2 : 0;
     const termWidth = process.stdout.columns || 80;
     const padding = termWidth - leftLen - rightLen;
 
-    const rightSegment = chalk.hex(theme.primaryColor)(
-        " ".repeat(Math.max(0, padding)) +
-        chalk.hex(theme.backgroundColor)(icons.sepLeft) +
-        ` ${rightText} `
-    );
+    let rightSegment = "";
+    if (rightText.length > 0) {
+        rightSegment = chalk.hex(theme.primaryColor)(
+            " ".repeat(Math.max(0, padding)) +
+            chalk.hex(theme.backgroundColor)(icons.sepLeft) +
+            ` ${rightText} `
+        );
+    }
 
-    const line2 = chalk.hex(theme.accentColor)("❯ ");
+    const line2 = chalk.hex(theme.accentColor)(`${promptSymbol} `);
 
     return `${line1}${rightSegment}\n${line2}`
 }

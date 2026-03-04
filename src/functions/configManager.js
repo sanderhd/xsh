@@ -4,6 +4,17 @@ import path from "path";
 
 const rcPath = path.join(os.homedir(), ".xshrc");
 
+const defaultConfig = {
+    theme: "default",
+    prompt: {
+        symbol: "❯",
+        showGitBranch: true,
+        showExitCode: true,
+        showTime: true,
+        showDuration: true,
+    },
+};
+
 function loadConfig() {
     try {
        if (fs.existsSync(rcPath)) {
@@ -51,8 +62,16 @@ function setConfigValue(key, value) {
     return saveConfig(config);
 }
 
+function resetConfig() {
+    return saveConfig(structuredClone(defaultConfig));
+}
+
+function getDefaultConfig() {
+    return structuredClone(defaultConfig);
+}
+
 function getConfigPath() {
     return rcPath;
 }
 
-export { loadConfig, saveConfig, getConfigValue, setConfigValue, getConfigPath };
+export { loadConfig, saveConfig, getConfigValue, setConfigValue, getConfigPath, resetConfig, getDefaultConfig };
