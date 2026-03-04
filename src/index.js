@@ -7,8 +7,9 @@ import fs from "fs";
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url";
 
-import icons from "./config/icons.json" with { type: "json" }
-import autocomplete from "./functions/autocompletion.js";
+import icons from "./config/icons.json" with { type: "json" };
+import { getTheme, getThemeName, setTheme, listThemes } from "./functions/themeManager.js";
+import autocomplete from "./functions/autoCompletion.js";
 
 let lastExitCode = 0;
 let lastDuration = null;
@@ -82,6 +83,7 @@ function getGitBranch() {
 }
 
 async function renderPrompt() {
+    const theme = getTheme();
     const cwd = getCwdLabel();
     const branch = await getGitBranch();
     await loadCommands();
@@ -96,19 +98,19 @@ async function renderPrompt() {
     const segs = [];
 
     segs.push({
-        bgColor: lastExitCode === 0 ? "#6e40c9" : "#a371f7",
-        render: segment(status, { fgColor: "#ffffff", bgColor: lastExitCode === 0 ? "#6e40c9" : "#a371f7" }),
+        bgColor: lastExitCode === 0 ? theme.accentColor : theme.warningColor,
+        render: segment(status, { fgColor: theme.primaryColor, bgColor: lastExitCode === 0 ? theme.accentColor : theme.warningColor }),
     });
 
     segs.push({
-        bgColor: "#7d4fd4",
-        render: segment(`${icons.folder}  ${cwd}`, { fgColor: "#ffffff", bgColor: "#7d4fd4" }),
+        bgColor: theme.backgroundColor,
+        render: segment(`${icons.folder}  ${cwd}`, { fgColor: theme.primaryColor, bgColor: theme.backgroundColor }),
     })
 
     if (branch) {
         segs.push({
-            bgColor: "#a371f7",
-            render: segment(`${icons.branch} ${branch}`, { fgColor: "#0d1117", bgColor: "#a371f7" }),
+            bgColor: theme.successColor,
+            render: segment(`${icons.branch} ${branch}`, { fgColor: theme.backgroundColor, bgColor: theme.successColor }),
         });
     }
 
@@ -141,13 +143,13 @@ async function renderPrompt() {
     const termWidth = process.stdout.columns || 80;
     const padding = termWidth - leftLen - rightLen;
 
-    const rightSegment = chalk.hex("#8b949e")(
+    const rightSegment = chalk.hex(theme.primaryColor)(
         " ".repeat(Math.max(0, padding)) +
-        chalk.hex("#2d333b")(icons.sepLeft) +
+        chalk.hex(theme.backgroundColor)(icons.sepLeft) +
         ` ${rightText} `
     );
 
-    const line2 = chalk.hex("#a371f7")("❯ ");
+    const line2 = chalk.hex(theme.accentColor)("❯ ");
 
     return `${line1}${rightSegment}\n${line2}`
 }
@@ -380,7 +382,7 @@ async function loop() {
                 process.chdir(next);
                 lastExitCode = 0;
             } catch {
-                console.error(chalk.red(`cd: no such dir ${next}`));
+                console.error(chalk.hex(getTheme().errorColor)(`cd: no such dir ${next}`));
                 lastExitCode = 1;
             }
             continue;

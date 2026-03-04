@@ -1,11 +1,13 @@
 import chalk from "chalk";
 import icons from "../config/icons.json" with { type: "json" };
+import { getTheme } from "../functions/themeManager.js";
 
 export default {
     name: "help",
     aliases: ["h"],
     run: async ({ args, print }) => {
-        print(chalk.hex("#a371f7")(`
+        const theme = getTheme();
+        print(chalk.hex(theme.accentColor)(`
             ${icons.xsh} xsh - a simple custom shell written in node.js
 
             usage:

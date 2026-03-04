@@ -1,20 +1,22 @@
 import chalk from "chalk";
 import fs from "fs";
+import { getTheme } from "../functions/themeManager.js";
 
 export default {
     name: "cat",
     aliases: ["bat", "batcat", "get"],
     run: async ({ args, print }) => {
+        const theme = getTheme();
         if (!args[0]) {
-            print(chalk.red("Please provide a file path"));
+            print(chalk.hex(theme.errorColor)("Please provide a file path"));
             return;
         }
 
         try {
             const content = fs.readFileSync(args[0], "utf-8");
-            print(chalk.hex("#a371f7")(content));
+            print(chalk.hex(theme.accentColor)(content));
         } catch (error) {
-            print(chalk.red(`Error reading file: ${error.message}`));
+            print(chalk.hex(theme.errorColor)(`Error reading file: ${error.message}`));
         }
     },
 };

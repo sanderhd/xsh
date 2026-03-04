@@ -2,16 +2,17 @@ import path from "path";
 import fs from "fs/promises";
 import chalk from "chalk";
 import icons from "../config/icons.json" with { type: "json" };
+import { getTheme } from "../functions/themeManager.js";
 
 export default {
     name: "mkdir",
     aliases: ["md"],
     run: async ({ args, print }) => {
-
-        const title = chalk.bold.hex("#a371f7");
-        const success = chalk.green;
-        const error = chalk.red;
-        const info = chalk.gray;
+        const theme = getTheme();
+        const title = chalk.bold.hex(theme.accentColor);
+        const success = chalk.hex(theme.successColor);
+        const error = chalk.hex(theme.errorColor);
+        const info = chalk.hex(theme.primaryColor);
 
         if (args.length === 0) {
             print(title(`${icons.folder} mkdir`) + "\n" + info("Usage: mkdir <folder> [folder2 ...]"));

@@ -2,14 +2,16 @@ import fs from "fs";
 import readline from "readline";
 import chalk from "chalk";
 import { exit } from "process";
+import { getTheme } from "../functions/themeManager.js";
 
 export default {
     name: "nano",
     run: async ({ args, print }) => {
+        const theme = getTheme();
         const file = args[0];
 
         if (!file) {
-            print(chalk.red("Usage: nano <file>"));
+            print(chalk.hex(theme.errorColor)("Usage: nano <file>"));
             return;
         }
 
@@ -20,7 +22,7 @@ export default {
         }
 
         console.clear();
-        console.log(chalk.gray("Simple Nano - Ctrl+S = save | Ctrl+X = exit\n"));
+        console.log(chalk.hex(theme.primaryColor)("Simple Nano - Ctrl+S = save | Ctrl+X = exit\n"));
         
         console.log(content);
 
@@ -38,7 +40,7 @@ export default {
 
             if (key[0] === 19) {
                 fs.writeFileSync(file, buffer);
-                console.log(chalk.green("\nSaved."));
+                console.log(chalk.hex(theme.successColor)("\nSaved."));
                 return;
             }
 

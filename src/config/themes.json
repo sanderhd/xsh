@@ -1,1 +1,38 @@
-{}
+{
+  "default": {
+    "primaryColor": "#ffffff",
+    "backgroundColor": "#1e1e1e",
+    "accentColor": "#007acc",
+    "errorColor": "#f44747",
+    "successColor": "#4ec9b0",
+    "warningColor": "#cca700",
+    "promptColor": "#6a9955"
+  },
+  "light": {
+    "primaryColor": "#000000",
+    "backgroundColor": "#ffffff",
+    "accentColor": "#0066b8",
+    "errorColor": "#d32f2f",
+    "successColor": "#388e3c",
+    "warningColor": "#f57c00",
+    "promptColor": "#2e7d32"
+  },
+  "ocean": {
+    "primaryColor": "#c0d6e4",
+    "backgroundColor": "#0a1929",
+    "accentColor": "#5090d3",
+    "errorColor": "#ff6b6b",
+    "successColor": "#66bb6a",
+    "warningColor": "#ffa726",
+    "promptColor": "#4fc3f7"
+  },
+  "space": {
+    "primaryColor": "#ffffff",
+    "backgroundColor": "#0d1117",
+    "accentColor": "#6e40c9",
+    "errorColor": "#f85149",
+    "successColor": "#a371f7",
+    "warningColor": "#a371f7",
+    "promptColor": "#7d4fd4"
+  }
+}
