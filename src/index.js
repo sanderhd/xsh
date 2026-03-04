@@ -7,15 +7,8 @@ import fs from "fs";
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url";
 
-const icons = {
-    sep: "▶",
-    sepLeft: "◀",
-    branch: "@",
-    ok: "✔",
-    fail: "✖",
-    folder: "🗀",
-    github: "^",
-};
+import icons from "./config/icons.json" with { type: "json" }
+import autocomplete from "./functions/autocompletion.js";
 
 let lastExitCode = 0;
 let lastDuration = null;
@@ -91,7 +84,7 @@ function getGitBranch() {
 async function renderPrompt() {
     const cwd = getCwdLabel();
     const branch = await getGitBranch();
-    loadCommands();
+    await loadCommands();
 
     const status = lastExitCode === 0
         ? `${icons.ok} 0`
@@ -167,25 +160,27 @@ let cursorPos = 0;
 let firstDraw = true;
 let history = [];
 let historyIndex = -1;
+let liveSuggestion = "";
 
 const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 function redraw(promptStr) {
     const visiblePromptLen = stripAnsi(promptStr).length;
     const desiredCursorCol = visiblePromptLen + cursorPos;
-    const fullLine = promptStr + buffer;
+    const suggestionStyled = liveSuggestion ? chalk.hex("#6e767d")(liveSuggestion) : "";
+    const fullLine = promptStr + buffer + suggestionStyled;
 
     if (firstDraw) {
         firstDraw = false;
         process.stdout.write(fullLine);
-        const endCol = visiblePromptLen + buffer.length;
+        const endCol = visiblePromptLen + buffer.length + stripAnsi(liveSuggestion).length;
         const leftMoves = endCol - desiredCursorCol;
         if (leftMoves > 0) process.stdout.write(`\x1b[${leftMoves}D`);
     } else {
         process.stdout.write("\x1b[2K\x1b[G");
         process.stdout.write("\x1b[1A\x1b[2K\x1b[G");
         process.stdout.write(fullLine);
-        const endCol = visiblePromptLen + buffer.length;
+        const endCol = visiblePromptLen + buffer.length + stripAnsi(liveSuggestion).length;
         const leftMoves = endCol - desiredCursorCol;
         if (leftMoves > 0) process.stdout.write(`\x1b[${leftMoves}D`);
     }
@@ -206,6 +201,7 @@ async function loop() {
     while (true) {
         buffer = "";
         firstDraw = true;
+        liveSuggestion = "";
         const promptStr = await renderPrompt();
         redraw(promptStr);
 
@@ -215,6 +211,49 @@ async function loop() {
                     process.stdin.removeListener("keypress", onKey);
                     process.exit(0);
                 }
+
+                if (!(key?.name === "tab" || key?.sequence === "\t")) {
+                    liveSuggestion = "";
+                }
+
+                if (key?.name === "tab" || key?.sequence === "\t") {
+                    try {
+                        const { candidates, replaceStart, replaceEnd } = autocomplete.complete(buffer, cursorPos, customCommands);
+                        if (!candidates || candidates.length === 0 ) return;
+
+                        if (candidates.length === 1) {
+                            const completion = candidates[0];
+                            buffer = buffer.slice(0, replaceStart) + completion + buffer.slice(replaceEnd);
+                            cursorPos = replaceStart + completion.length;
+                            redraw(promptStr);
+                            return
+                        }
+
+                        let common = candidates[0];
+                        for (const c of candidates) {
+                            let i = 0;
+                            while (i < common.length && i < c.length && common[i] === c[i]) i++;
+                            common = common.slice(0, i);
+                        }
+
+                        const typedLen = cursorPos - replaceStart;
+                        if (common.length > typedLen) {
+                            buffer = buffer.slice(0, replaceStart) + common + buffer.slice(replaceEnd);
+                            cursorPos = replaceStart + common.length;
+                            redraw(promptStr);
+                            return;
+                        }
+
+                        const firstRem = candidates[0].slice(typedLen) || "";
+                        liveSuggestion = firstRem;
+                        process.stdout.write("\n" + candidates.join("    ") + "\n");
+                        firstDraw = true;
+                        redraw(promptStr);
+                    } catch (e) {
+
+                    }
+                    return;
+                 }
 
                 if (key?.name === "return") {
                     process.stdin.removeListener("keypress", onKey);
@@ -331,14 +370,6 @@ async function loop() {
             }
             lastDuration = Date.now() - start;
             continue
-        }
-
-        if (cmd === "exit") process.exit(0);
-
-        if (cmd === "clear") {
-            process.stdout.write("\x1b[2J\x1b[H");
-            lastExitCode = 0;
-            continue;
         }
 
         if (cmd.startsWith("cd ")) {

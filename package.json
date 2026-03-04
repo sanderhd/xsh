@@ -18,12 +18,9 @@
   "license": "MIT",
   "author": "sanderhd",
   "type": "module",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
-    "test": "xsh"
-  },
-  "bin": {
-    "xsh": "./bin/index.js"
+    "xsh": "node src/index.js"
   },
   "dependencies": {
     "chalk": "^5.6.2"
