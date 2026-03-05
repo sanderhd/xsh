@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import chalk from "chalk";
 import readline from "node:readline"
 import { exec } from "node:child_process"

@@ -19,6 +19,9 @@
   "author": "sanderhd",
   "type": "module",
   "main": "src/index.js",
+  "bin": {
+    "xsh": "./src/index.js"
+  },
   "scripts": {
     "xsh": "node src/index.js"
   },
