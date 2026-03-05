@@ -2,7 +2,7 @@ import chalk from "chalk";
 import readline from "node:readline"
 import { exec } from "node:child_process"
 import os from "node:os"
-import process, { stderr, stdout } from "node:process";
+import process, { env, stderr, stdout } from "node:process";
 import fs from "fs";
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url";
@@ -84,6 +84,23 @@ function getGitBranch() {
     });
 }
 
+async function detectEnviroment() {
+    if (process.env.VIRTUAL_ENV) {
+        const venvName = path.basename(process.env.VIRTUAL_ENV);
+        return { type: 'venv', value: `🐍 ${venvName}`}
+    }
+
+    if (fs.existsSync(path.join(process.cwd(), 'Dockerfile')) || fs.existsSync(path.join(process.cwd(), 'docker-compose-yml'))) {
+        return { type: 'docker', value: '🐳 Docker'}
+    }
+
+    const pkgPath = path.join(process.cwd(), 'package.json');
+    if (fs.existsSync(pkgPath)) {
+        const nodeVersion = process.version;
+        return { type: 'node', value: `📦 ${nodeVersion}` };
+    }
+}
+
 async function renderPrompt() {
     const theme = getTheme();
     const cwd = getCwdLabel();
@@ -127,7 +144,11 @@ async function renderPrompt() {
     const line1 = joinSegments(segs);
 
     const rightParts = [];
-    if (lastDuration === null && showTime) {
+    const envInfo = await detectEnviroment();
+
+    if (envInfo) {
+        rightParts.push(envInfo.value);
+    } else if (lastDuration === null && showTime) {
         rightParts.push(`⏱ ${timeStr}`);
     } else if (lastDuration !== null && showDuration) {
         const totalSecs = Math.floor(lastDuration / 1000);
