@@ -10,5 +10,5 @@
 
 ### Todo
 - [x] themes
-- [ ] more commands like nano, ls & more
-- [ ] support for docker, venv's, node version & more
+- [x] more commands like nano, ls & more
+- [x] support for docker, venv's, node version & more
