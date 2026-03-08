@@ -1,6 +1,6 @@
 {
-  "name": "xsh",
-  "version": "1.0.0",
+  "name": "xsh-shell",
+  "version": "1.2.0",
   "description": "xsh is a mordern windows shell",
   "keywords": [
     "terminal",
